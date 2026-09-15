@@ -50,7 +50,7 @@ export default async function AdminLayout({
             Pending Approvals
           </Link>
           <Link
-            href="/support-inbox"
+            href="/support"
             className="block px-4 py-2 rounded-md hover:bg-indigo-800 transition-colors"
           >
             Support Inbox
