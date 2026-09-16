@@ -30,14 +30,15 @@ function buildThreads(data: any[]): Thread[] {
   return Array.from(uniqueThreads.values())
 }
 
+// Initialize a stable singleton outside the component body to prevent reconnection/stale closure bugs
+const supabase = createClient()
+
 export default function SupportClient() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
-
-  const supabase = createClient()
 
   const fetchThreads = async () => {
     const { data, error } = await supabase
@@ -79,12 +80,15 @@ export default function SupportClient() {
           schema: 'public',
           table: 'support_messages',
         },
-        () => {
+        (payload) => {
+          console.log('[Realtime: support_messages] Received payload:', JSON.stringify(payload, null, 2));
           // Re-fetch the full thread list on any change
           fetchThreads()
         }
       )
-      .subscribe()
+      .subscribe((status: string) => {
+        console.log('[Realtime: support_messages] Subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel)
