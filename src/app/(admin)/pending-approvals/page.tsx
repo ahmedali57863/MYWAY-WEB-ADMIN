@@ -71,6 +71,14 @@ export default async function PendingApprovalsPage() {
 
   profiles?.forEach((p) => {
     addPath(p.avatar_url)
+    if (p.document_urls) {
+      addPath(p.document_urls.cnic_url)
+      addPath(p.document_urls.license_url)
+      addPath(p.document_urls.vehicle_url)
+      addPath(p.document_urls.cnic_front_url)
+      addPath(p.document_urls.cnic_back_url)
+      addPath(p.document_urls.registration_url)
+    }
   })
 
   const signedUrlsMap = await getSignedUrlsBatch(pathsToSign)
@@ -78,27 +86,44 @@ export default async function PendingApprovalsPage() {
   // Enrich driver applications
   const enrichedDriverApps = (driverApplications || []).map((app) => {
     const prof = profilesMap.get(app.user_id) || {}
+    const profDocs = prof.document_urls || {}
     const email = prof.email || authUsersMap.get(app.user_id) || null
     const veh = (app.vehicle_id ? vehiclesById.get(app.vehicle_id) : null) || vehiclesByUser.get(app.user_id) || null
 
-    const regDocSignedUrl = app.registration_doc_url
-      ? signedUrlsMap.get(app.registration_doc_url) || null
-      : veh?.registration_doc_url
-      ? signedUrlsMap.get(veh.registration_doc_url) || null
-      : null
+    const profLicense = profDocs.license_url
+    const profVehicle = profDocs.vehicle_url || profDocs.registration_url
+    const profCnic = profDocs.cnic_url || profDocs.cnic_front_url
+    const profCnicBack = profDocs.cnic_back_url || profDocs.cnic_url
 
-    const licenseDocSignedUrl = app.license_doc_url
-      ? signedUrlsMap.get(app.license_doc_url) || null
-      : veh?.license_doc_url
-      ? signedUrlsMap.get(veh.license_doc_url) || null
-      : null
+    const regDocSignedUrl =
+      (profVehicle && signedUrlsMap.get(profVehicle)) ||
+      (app.registration_doc_url && signedUrlsMap.get(app.registration_doc_url)) ||
+      (veh?.registration_doc_url && signedUrlsMap.get(veh.registration_doc_url)) ||
+      null
+
+    const licenseDocSignedUrl =
+      (profLicense && signedUrlsMap.get(profLicense)) ||
+      (app.license_doc_url && signedUrlsMap.get(app.license_doc_url)) ||
+      (veh?.license_doc_url && signedUrlsMap.get(veh.license_doc_url)) ||
+      null
 
     const photoSignedUrl =
+      (profVehicle && signedUrlsMap.get(profVehicle)) ||
       (app.vehicle_photo_url && signedUrlsMap.get(app.vehicle_photo_url)) ||
       (app.photo_url && signedUrlsMap.get(app.photo_url)) ||
       (veh?.photo_url && signedUrlsMap.get(veh.photo_url)) ||
       (veh?.vehicle_photo_url && signedUrlsMap.get(veh.vehicle_photo_url)) ||
       regDocSignedUrl ||
+      null
+
+    const cnicFrontSignedUrl =
+      (profCnic && signedUrlsMap.get(profCnic)) ||
+      (app.cnic_front_url && signedUrlsMap.get(app.cnic_front_url)) ||
+      null
+
+    const cnicBackSignedUrl =
+      (profCnicBack && signedUrlsMap.get(profCnicBack)) ||
+      (app.cnic_back_url && signedUrlsMap.get(app.cnic_back_url)) ||
       null
 
     const avatarSignedUrl = prof.avatar_url ? signedUrlsMap.get(prof.avatar_url) || prof.avatar_url : null
@@ -117,6 +142,8 @@ export default async function PendingApprovalsPage() {
       license_signed_url: licenseDocSignedUrl,
       registration_signed_url: regDocSignedUrl,
       vehicle_photo_signed_url: photoSignedUrl,
+      cnic_front_signed_url: cnicFrontSignedUrl,
+      cnic_back_signed_url: cnicBackSignedUrl,
     }
   })
 
@@ -141,8 +168,27 @@ export default async function PendingApprovalsPage() {
   const enrichedVerifications = (verifications || []).map((v) => {
     if (v.user_id) seenVerifUserIds.add(v.user_id)
     const prof = profilesMap.get(v.user_id) || {}
+    const profDocs = prof.document_urls || {}
     const email = prof.email || authUsersMap.get(v.user_id) || null
     const avatarSignedUrl = prof.avatar_url ? signedUrlsMap.get(prof.avatar_url) || prof.avatar_url : null
+
+    const profCnic = profDocs.cnic_url || profDocs.cnic_front_url
+    const profCnicBack = profDocs.cnic_back_url || profDocs.cnic_url
+    const profLicense = profDocs.license_url
+    const profVehicle = profDocs.vehicle_url
+
+    const cnicFrontSignedUrl =
+      (v.cnic_front_url && signedUrlsMap.get(v.cnic_front_url)) ||
+      (profCnic && signedUrlsMap.get(profCnic)) ||
+      null
+
+    const cnicBackSignedUrl =
+      (v.cnic_back_url && signedUrlsMap.get(v.cnic_back_url)) ||
+      (profCnicBack && signedUrlsMap.get(profCnicBack)) ||
+      null
+
+    const licenseSignedUrl = profLicense ? signedUrlsMap.get(profLicense) || null : null
+    const registrationSignedUrl = profVehicle ? signedUrlsMap.get(profVehicle) || null : null
 
     return {
       ...v,
@@ -155,8 +201,10 @@ export default async function PendingApprovalsPage() {
         cnic_number: v.cnic_number || prof.cnic_number || prof.cnic || null,
       },
       selfie_signed_url: v.selfie_url ? signedUrlsMap.get(v.selfie_url) || null : null,
-      cnic_front_signed_url: v.cnic_front_url ? signedUrlsMap.get(v.cnic_front_url) || null : null,
-      cnic_back_signed_url: v.cnic_back_url ? signedUrlsMap.get(v.cnic_back_url) || null : null,
+      cnic_front_signed_url: cnicFrontSignedUrl,
+      cnic_back_signed_url: cnicBackSignedUrl,
+      license_signed_url: licenseSignedUrl,
+      registration_signed_url: registrationSignedUrl,
     }
   })
 
@@ -166,8 +214,15 @@ export default async function PendingApprovalsPage() {
       p.verification_status?.toLowerCase() === 'pending' &&
       !seenVerifUserIds.has(p.id)
     ) {
+      const profDocs = p.document_urls || {}
       const email = p.email || authUsersMap.get(p.id) || null
       const avatarSignedUrl = p.avatar_url ? signedUrlsMap.get(p.avatar_url) || p.avatar_url : null
+
+      const profCnic = profDocs.cnic_url || profDocs.cnic_front_url
+      const profCnicBack = profDocs.cnic_back_url || profDocs.cnic_url
+      const profLicense = profDocs.license_url
+      const profVehicle = profDocs.vehicle_url
+
       enrichedVerifications.push({
         id: p.id,
         user_id: p.id,
@@ -182,8 +237,10 @@ export default async function PendingApprovalsPage() {
           cnic_number: p.cnic_number || p.cnic || null,
         },
         selfie_signed_url: null,
-        cnic_front_signed_url: null,
-        cnic_back_signed_url: null,
+        cnic_front_signed_url: profCnic ? signedUrlsMap.get(profCnic) || null : null,
+        cnic_back_signed_url: profCnicBack ? signedUrlsMap.get(profCnicBack) || null : null,
+        license_signed_url: profLicense ? signedUrlsMap.get(profLicense) || null : null,
+        registration_signed_url: profVehicle ? signedUrlsMap.get(profVehicle) || null : null,
       })
     }
   })

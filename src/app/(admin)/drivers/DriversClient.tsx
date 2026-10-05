@@ -956,8 +956,12 @@ function DriverSpecModal({
 
               <div className="document-grid">
                 {/* Driver License Document */}
-                <button
-                  className="document-card"
+                <DriverDocThumbnailCard
+                  title="Driving License Document"
+                  tag="LICENSE"
+                  number={driver.licenseNumber}
+                  sub={`Expires: ${driver.licenseExpiry}`}
+                  url={driver.licenseSignedUrl}
                   onClick={() =>
                     onOpenDoc({
                       title: 'Driving License Document',
@@ -967,23 +971,15 @@ function DriverSpecModal({
                       owner: driver.name,
                     })
                   }
-                  type="button"
-                >
-                  <div className="document-preview violet">
-                    <span>LICENSE</span>
-                    <Icon name="car" size={18} />
-                    <b>{driver.licenseNumber}</b>
-                  </div>
-                  <span>
-                    <b>Driving License Document</b>
-                    <small>Expires: {driver.licenseExpiry}</small>
-                  </span>
-                  <Icon name="eye" size={16} />
-                </button>
+                />
 
                 {/* Vehicle Registration Certificate */}
-                <button
-                  className="document-card"
+                <DriverDocThumbnailCard
+                  title="Vehicle Registration Proof"
+                  tag="REGISTRATION"
+                  number={driver.vehicle?.plate || 'REG-DOC'}
+                  sub="Official Excise Document"
+                  url={driver.registrationSignedUrl || driver.vehicle?.signedDocUrl}
                   onClick={() =>
                     onOpenDoc({
                       title: 'Vehicle Registration Certificate',
@@ -993,23 +989,15 @@ function DriverSpecModal({
                       owner: driver.name,
                     })
                   }
-                  type="button"
-                >
-                  <div className="document-preview slate">
-                    <span>REGISTRATION</span>
-                    <Icon name="shield" size={18} />
-                    <b>{driver.vehicle?.plate || 'EXCISE-DOC'}</b>
-                  </div>
-                  <span>
-                    <b>Vehicle Registration Proof</b>
-                    <small>Official Excise Document</small>
-                  </span>
-                  <Icon name="eye" size={16} />
-                </button>
+                />
 
                 {/* CNIC Front */}
-                <button
-                  className="document-card"
+                <DriverDocThumbnailCard
+                  title="National ID Card (Front)"
+                  tag="CNIC FRONT"
+                  number={driver.cnicNumber}
+                  sub="NADRA verification scan"
+                  url={driver.cnicFrontSignedUrl}
                   onClick={() =>
                     onOpenDoc({
                       title: 'CNIC Front Scan',
@@ -1019,23 +1007,15 @@ function DriverSpecModal({
                       owner: driver.name,
                     })
                   }
-                  type="button"
-                >
-                  <div className="document-preview blue">
-                    <span>CNIC FRONT</span>
-                    <Icon name="users" size={18} />
-                    <b>{driver.cnicNumber}</b>
-                  </div>
-                  <span>
-                    <b>National ID Card (Front)</b>
-                    <small>NADRA verification scan</small>
-                  </span>
-                  <Icon name="eye" size={16} />
-                </button>
+                />
 
                 {/* CNIC Back */}
-                <button
-                  className="document-card"
+                <DriverDocThumbnailCard
+                  title="National ID Card (Back)"
+                  tag="CNIC BACK"
+                  number={driver.cnicNumber}
+                  sub="Address and family record"
+                  url={driver.cnicBackSignedUrl}
                   onClick={() =>
                     onOpenDoc({
                       title: 'CNIC Back Scan',
@@ -1045,24 +1025,16 @@ function DriverSpecModal({
                       owner: driver.name,
                     })
                   }
-                  type="button"
-                >
-                  <div className="document-preview blue">
-                    <span>CNIC BACK</span>
-                    <Icon name="users" size={18} />
-                    <b>{driver.cnicNumber}</b>
-                  </div>
-                  <span>
-                    <b>National ID Card (Back)</b>
-                    <small>Address and family record</small>
-                  </span>
-                  <Icon name="eye" size={16} />
-                </button>
+                />
 
                 {/* Driver Live Selfie */}
                 {driver.selfieSignedUrl && (
-                  <button
-                    className="document-card"
+                  <DriverDocThumbnailCard
+                    title="Driver Verification Selfie"
+                    tag="LIVE SELFIE"
+                    number="FACE VERIFIED"
+                    sub="Real-time liveness proof"
+                    url={driver.selfieSignedUrl}
                     onClick={() =>
                       onOpenDoc({
                         title: 'Live Selfie & Face Verification',
@@ -1071,19 +1043,7 @@ function DriverSpecModal({
                         owner: driver.name,
                       })
                     }
-                    type="button"
-                  >
-                    <div className="document-preview green">
-                      <span>SELFIE</span>
-                      <Icon name="users" size={18} />
-                      <b>VERIFIED</b>
-                    </div>
-                    <span>
-                      <b>Driver Live Verification Selfie</b>
-                      <small>Real-time liveness proof</small>
-                    </span>
-                    <Icon name="eye" size={16} />
-                  </button>
+                  />
                 )}
               </div>
             </section>
@@ -1212,3 +1172,189 @@ function DriverSpecModal({
     </div>
   )
 }
+
+function DriverDocThumbnailCard({
+  title,
+  tag,
+  number,
+  sub,
+  url,
+  onClick,
+}: {
+  title: string
+  tag: string
+  number: string
+  sub: string
+  url?: string | null
+  onClick?: () => void
+}) {
+  const hasImage = Boolean(url && url.trim().length > 0)
+
+  return (
+    <div
+      className={`document-card ${hasImage ? 'has-uploaded-doc' : 'empty-doc'}`}
+      onClick={hasImage ? onClick : undefined}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: '12px',
+        border: hasImage ? '1.5px solid #c7d2fe' : '1px solid #e2e8f0',
+        background: hasImage ? '#ffffff' : '#f8fafc',
+        padding: '12px',
+        gap: '10px',
+        cursor: hasImage ? 'pointer' : 'default',
+        boxShadow: hasImage ? '0 4px 12px rgba(99, 102, 241, 0.08)' : 'none',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {/* Top Header & Status Chip */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <span style={{ fontSize: '11px', fontWeight: 800, color: hasImage ? '#4338ca' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {tag}
+        </span>
+        {hasImage ? (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '10px',
+              fontWeight: 800,
+              color: '#15803d',
+              background: '#dcfce7',
+              border: '1px solid #bbf7d0',
+              padding: '2px 8px',
+              borderRadius: '6px',
+            }}
+          >
+            <Icon name="check" size={11} /> Image Attached
+          </span>
+        ) : (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '10px',
+              fontWeight: 800,
+              color: '#b91c1c',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              padding: '2px 8px',
+              borderRadius: '6px',
+            }}
+          >
+            <Icon name="alert" size={11} /> Not Uploaded
+          </span>
+        )}
+      </div>
+
+      {/* Visual Preview Box */}
+      <div
+        style={{
+          width: '100%',
+          height: '115px',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          position: 'relative',
+          background: hasImage ? '#0f172a' : '#f1f5f9',
+          border: '1px solid #e2e8f0',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        {hasImage ? (
+          <>
+            <img
+              src={url!}
+              alt={title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to top, rgba(15,23,42,0.7) 0%, transparent 60%)',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                padding: '8px',
+                color: 'white',
+              }}
+            >
+              <span style={{ fontSize: '10.5px', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                {number}
+              </span>
+              <span
+                style={{
+                  background: 'rgba(255,255,255,0.92)',
+                  color: '#0f172a',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  fontSize: '9.5px',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Icon name="eye" size={11} /> Click to view
+              </span>
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              color: '#94a3b8',
+              textAlign: 'center',
+              padding: '12px',
+            }}
+          >
+            <Icon name={tag.includes('LICENSE') ? 'car' : 'shield'} size={26} />
+            <strong style={{ fontSize: '11px', color: '#64748b' }}>Document Not Attached</strong>
+            <small style={{ fontSize: '10px', color: '#94a3b8' }}>{number}</small>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Info */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <b style={{ fontSize: '12px', fontWeight: 800, color: '#1e293b' }}>{title}</b>
+          <small style={{ fontSize: '11px', color: '#64748b' }}>{sub}</small>
+        </div>
+        {hasImage && (
+          <button
+            type="button"
+            onClick={onClick}
+            style={{
+              border: '1px solid #e0e7ff',
+              background: '#eef2ff',
+              color: '#4f46e5',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Icon name="eye" size={12} /> Inspect
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+

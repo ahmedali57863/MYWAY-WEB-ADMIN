@@ -690,11 +690,10 @@ function DriverReview({
                 number={application.cnic} 
                 type="National identity card" 
                 color="violet"
+                imageUrl={application.cnicFrontUrl}
                 onClick={() => {
                   if (application.cnicFrontUrl) {
                     onViewDocument(`${application.name} - CNIC Front`, application.cnicFrontUrl)
-                  } else {
-                    alert('CNIC front document file not attached.')
                   }
                 }}
               />
@@ -703,11 +702,10 @@ function DriverReview({
                 number="Issued by NADRA" 
                 type="National identity card" 
                 color="slate" 
+                imageUrl={application.cnicBackUrl}
                 onClick={() => {
                   if (application.cnicBackUrl) {
                     onViewDocument(`${application.name} - CNIC Back`, application.cnicBackUrl)
-                  } else {
-                    alert('CNIC back document file not attached.')
                   }
                 }}
               />
@@ -716,11 +714,10 @@ function DriverReview({
                 number={application.license} 
                 type={`Expires ${application.licenseExpiry}`} 
                 color="blue" 
+                imageUrl={application.licenseUrl}
                 onClick={() => {
                   if (application.licenseUrl) {
                     onViewDocument(`${application.name} - Driving License`, application.licenseUrl)
-                  } else {
-                    alert('Driving license document file not attached.')
                   }
                 }}
               />
@@ -729,11 +726,10 @@ function DriverReview({
                 number={application.registration} 
                 type={`${application.vehicle} · ${application.year}`} 
                 color="green" 
+                imageUrl={application.registrationUrl}
                 onClick={() => {
                   if (application.registrationUrl) {
                     onViewDocument(`${application.vehicle} - Registration Document`, application.registrationUrl)
-                  } else {
-                    alert('Vehicle registration document file not attached.')
                   }
                 }}
               />
@@ -782,27 +778,183 @@ function DocumentCard({
   number,
   type,
   color,
+  imageUrl,
   onClick
 }: {
   title: string
   number: string
   type: string
   color: string
+  imageUrl?: string | null
   onClick?: () => void
 }) {
+  const hasImage = Boolean(imageUrl && imageUrl.trim().length > 0)
+
   return (
-    <button className="document-card" type="button" onClick={onClick}>
-      <div className={`document-preview ${color}`}>
-        <span>MYWAY VERIFIED DOCUMENT</span>
-        <Icon name={title.includes("license") ? "car" : "shield"} size={28} />
-        <b>{number}</b>
+    <div 
+      className={`document-card ${hasImage ? 'has-uploaded-doc' : 'empty-doc'}`}
+      onClick={hasImage ? onClick : undefined}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: '12px',
+        border: hasImage ? '1.5px solid #c7d2fe' : '1px solid #e2e8f0',
+        background: hasImage ? '#ffffff' : '#f8fafc',
+        padding: '12px',
+        gap: '10px',
+        cursor: hasImage ? 'pointer' : 'default',
+        boxShadow: hasImage ? '0 4px 12px rgba(99, 102, 241, 0.08)' : 'none',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {/* Top Header & Status Chip */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <span style={{ fontSize: '11px', fontWeight: 800, color: hasImage ? '#4338ca' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {title}
+        </span>
+        {hasImage ? (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '10px',
+              fontWeight: 800,
+              color: '#15803d',
+              background: '#dcfce7',
+              border: '1px solid #bbf7d0',
+              padding: '2px 8px',
+              borderRadius: '6px',
+            }}
+          >
+            <Icon name="check" size={11} /> Image Attached
+          </span>
+        ) : (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '10px',
+              fontWeight: 800,
+              color: '#b91c1c',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              padding: '2px 8px',
+              borderRadius: '6px',
+            }}
+          >
+            <Icon name="alert" size={11} /> Not Uploaded
+          </span>
+        )}
       </div>
-      <span>
-        <b>{title}</b>
-        <small>{type}</small>
-      </span>
-      <Icon name="chevron" />
-    </button>
+
+      {/* Visual Preview Box */}
+      <div
+        style={{
+          width: '100%',
+          height: '115px',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          position: 'relative',
+          background: hasImage ? '#0f172a' : '#f1f5f9',
+          border: '1px solid #e2e8f0',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        {hasImage ? (
+          <>
+            <img
+              src={imageUrl!}
+              alt={title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to top, rgba(15,23,42,0.7) 0%, transparent 60%)',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                padding: '8px',
+                color: 'white',
+              }}
+            >
+              <span style={{ fontSize: '10.5px', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                {number}
+              </span>
+              <span
+                style={{
+                  background: 'rgba(255,255,255,0.92)',
+                  color: '#0f172a',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  fontSize: '9.5px',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Icon name="eye" size={11} /> Click to view
+              </span>
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              color: '#94a3b8',
+              textAlign: 'center',
+              padding: '12px',
+            }}
+          >
+            <Icon name={title.includes('license') ? 'car' : 'shield'} size={26} />
+            <strong style={{ fontSize: '11px', color: '#64748b' }}>Document Not Attached</strong>
+            <small style={{ fontSize: '10px', color: '#94a3b8' }}>{number}</small>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Info */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <b style={{ fontSize: '12px', fontWeight: 800, color: '#1e293b' }}>{title}</b>
+          <small style={{ fontSize: '11px', color: '#64748b' }}>{type}</small>
+        </div>
+        {hasImage && (
+          <button
+            type="button"
+            onClick={onClick}
+            style={{
+              border: '1px solid #e0e7ff',
+              background: '#eef2ff',
+              color: '#4f46e5',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Icon name="eye" size={12} /> Inspect
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 

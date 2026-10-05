@@ -109,6 +109,18 @@ export default async function DriversPage() {
     addPath(v.cnic_back_url)
   })
 
+  profiles?.forEach((p) => {
+    addPath(p.avatar_url)
+    if (p.document_urls) {
+      addPath(p.document_urls.cnic_url)
+      addPath(p.document_urls.license_url)
+      addPath(p.document_urls.vehicle_url)
+      addPath(p.document_urls.cnic_front_url)
+      addPath(p.document_urls.cnic_back_url)
+      addPath(p.document_urls.registration_url)
+    }
+  })
+
   const signedUrlsMap = await getSignedUrlsBatch(pathsToSign)
 
   // Identify all driver profile candidates:
@@ -137,10 +149,16 @@ export default async function DriversPage() {
 
   const mappedDrivers: DriverRecord[] = Array.from(driverUserIds).map((userId) => {
     const profile = profilesMap.get(userId)
+    const profDocs = profile?.document_urls || {}
     const app = appsByUser.get(userId)
     const veh = (app?.vehicle_id ? vehiclesById.get(app.vehicle_id) : null) || vehiclesByUser.get(userId)
     const verif = verificationsByUser.get(userId)
     const userRouteList = routesByUser.get(userId) || []
+
+    const profLicense = profDocs.license_url
+    const profVehicle = profDocs.vehicle_url || profDocs.registration_url
+    const profCnic = profDocs.cnic_url || profDocs.cnic_front_url
+    const profCnicBack = profDocs.cnic_back_url || profDocs.cnic_url
 
     const email = profile?.email || authUsersMap.get(userId) || 'driver@myway.pk'
     const name = profile?.full_name || 'Driver Applicant'
@@ -163,41 +181,42 @@ export default async function DriversPage() {
 
     // Vehicle resolution
     let vehicleObj: DriverVehicle | null = null
+    const vDocPath = profVehicle || veh?.registration_doc_url || app?.registration_doc_url || null
+    let vDocSignedUrl: string | null = null
+    if (vDocPath) {
+      if (vDocPath.startsWith('http://') || vDocPath.startsWith('https://') || vDocPath.startsWith('data:')) {
+        vDocSignedUrl = vDocPath
+      } else {
+        vDocSignedUrl = signedUrlsMap.get(vDocPath) || null
+      }
+    }
+
+    const vPhotoPath =
+      profVehicle ||
+      veh?.photo_url ||
+      veh?.vehicle_photo_url ||
+      veh?.image_url ||
+      veh?.picture_url ||
+      app?.vehicle_photo_url ||
+      app?.photo_url ||
+      app?.vehicle_image ||
+      vDocPath ||
+      null
+
+    let vSignedUrl: string | null = null
+    if (vPhotoPath) {
+      if (vPhotoPath.startsWith('http://') || vPhotoPath.startsWith('https://') || vPhotoPath.startsWith('data:')) {
+        vSignedUrl = vPhotoPath
+      } else {
+        vSignedUrl = signedUrlsMap.get(vPhotoPath) || null
+      }
+    }
+
+    if (!vSignedUrl && vDocSignedUrl) {
+      vSignedUrl = vDocSignedUrl
+    }
+
     if (veh) {
-      const vDocPath = veh.registration_doc_url || app?.registration_doc_url || null
-      let vDocSignedUrl: string | null = null
-      if (vDocPath) {
-        if (vDocPath.startsWith('http://') || vDocPath.startsWith('https://') || vDocPath.startsWith('data:')) {
-          vDocSignedUrl = vDocPath
-        } else {
-          vDocSignedUrl = signedUrlsMap.get(vDocPath) || null
-        }
-      }
-
-      const vPhotoPath =
-        veh.photo_url ||
-        veh.vehicle_photo_url ||
-        veh.image_url ||
-        veh.picture_url ||
-        app?.vehicle_photo_url ||
-        app?.photo_url ||
-        app?.vehicle_image ||
-        vDocPath ||
-        null
-
-      let vSignedUrl: string | null = null
-      if (vPhotoPath) {
-        if (vPhotoPath.startsWith('http://') || vPhotoPath.startsWith('https://') || vPhotoPath.startsWith('data:')) {
-          vSignedUrl = vPhotoPath
-        } else {
-          vSignedUrl = signedUrlsMap.get(vPhotoPath) || null
-        }
-      }
-
-      if (!vSignedUrl && vDocSignedUrl) {
-        vSignedUrl = vDocSignedUrl
-      }
-
       vehicleObj = {
         id: veh.id,
         make: veh.brand || 'Vehicle Make',
@@ -211,6 +230,21 @@ export default async function DriversPage() {
         vehicleImage: vSignedUrl || '',
         signedDocUrl: vDocSignedUrl,
         storagePath: vDocPath || null
+      }
+    } else if (profVehicle) {
+      vehicleObj = {
+        id: userId,
+        make: 'Driver Vehicle',
+        model: 'Registered Model',
+        year: 2023,
+        color: 'Standard',
+        plate: 'VEH-VERIF',
+        seats: 4,
+        hasAc: true,
+        isActive: true,
+        vehicleImage: vSignedUrl || '',
+        signedDocUrl: vDocSignedUrl,
+        storagePath: profVehicle
       }
     }
 
@@ -235,10 +269,10 @@ export default async function DriversPage() {
     })
 
     // Signed URLs for documents
-    const licenseDocPath = app?.license_doc_url || veh?.license_doc_url
-    const regDocPath = app?.registration_doc_url || veh?.registration_doc_url
-    const cnicFrontPath = verif?.cnic_front_url
-    const cnicBackPath = verif?.cnic_back_url
+    const licenseDocPath = profLicense || app?.license_doc_url || veh?.license_doc_url
+    const regDocPath = profVehicle || app?.registration_doc_url || veh?.registration_doc_url
+    const cnicFrontPath = profCnic || verif?.cnic_front_url
+    const cnicBackPath = profCnicBack || verif?.cnic_back_url
     const selfiePath = verif?.selfie_url
 
     // Resolve real authentic unmasked CNIC
