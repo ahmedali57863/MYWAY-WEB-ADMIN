@@ -30,10 +30,8 @@ function buildThreads(data: any[]): Thread[] {
   return Array.from(uniqueThreads.values())
 }
 
-// Initialize a stable singleton outside the component body to prevent reconnection/stale closure bugs
-const supabase = createClient()
-
 export default function SupportClient() {
+  const supabase = createClient()
   const [threads, setThreads] = useState<Thread[]>([])
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [replyText, setReplyText] = useState('')
