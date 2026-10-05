@@ -6,9 +6,36 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
+  const isHardcodedAdmin = request.cookies.get('hardcoded_admin')?.value === 'true'
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
+  const isProtectedRoute = !isAuthRoute && request.nextUrl.pathname !== '/not-authorized'
+
+  // Allow or redirect hardcoded admin immediately
+  if (isHardcodedAdmin) {
+    if (isAuthRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // If Supabase environment variables are missing, redirect protected routes to /login safely
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (isProtectedRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -31,18 +58,13 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isHardcodedAdmin = request.cookies.get('hardcoded_admin')?.value === 'true'
-
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isProtectedRoute = !isAuthRoute && request.nextUrl.pathname !== '/not-authorized'
-
-  if (!user && !isHardcodedAdmin && isProtectedRoute) {
+  if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if ((user || isHardcodedAdmin) && isAuthRoute) {
+  if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

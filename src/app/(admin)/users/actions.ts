@@ -21,22 +21,44 @@ export async function updateUserProfile(userId: string, data: {
   if (data.phone !== undefined) profileUpdates.phone = data.phone
   if (data.avatar_url !== undefined) profileUpdates.avatar_url = data.avatar_url
   if (data.is_admin !== undefined) profileUpdates.is_admin = data.is_admin
-  if (data.verification_status !== undefined) profileUpdates.verification_status = data.verification_status
-  if (data.is_pro !== undefined) profileUpdates.is_pro = data.is_pro
-  if (data.is_verified_driver !== undefined) profileUpdates.is_verified_driver = data.is_verified_driver
-  if (data.cnic_verified !== undefined) profileUpdates.cnic_verified = data.cnic_verified
-  if (data.verification_tier !== undefined) profileUpdates.verification_tier = data.verification_tier
-
-  if (data.is_pro === true) {
-    const expiryDate = new Date()
-    expiryDate.setMonth(expiryDate.getMonth() + 6)
-    profileUpdates.pro_expiry_date = expiryDate.toISOString()
+  if (data.verification_status !== undefined) {
+    const rawStatus = data.verification_status.toLowerCase().trim()
+    if (rawStatus === 'verified' || rawStatus === 'approved') {
+      profileUpdates.verification_status = 'verified'
+    } else if (rawStatus === 'pending') {
+      profileUpdates.verification_status = 'pending'
+    } else {
+      profileUpdates.verification_status = 'unverified'
+    }
   }
 
-  if (data.verification_tier === 'student') {
-    const expiryDate = new Date()
-    expiryDate.setMonth(expiryDate.getMonth() + 6)
-    profileUpdates.verification_expiry_date = expiryDate.toISOString()
+  if (data.is_pro !== undefined) {
+    profileUpdates.is_pro = data.is_pro
+    if (data.is_pro === true) {
+      const expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + 6)
+      profileUpdates.pro_expiry_date = expiryDate.toISOString()
+    } else {
+      profileUpdates.pro_expiry_date = null
+    }
+  }
+
+  if (data.is_verified_driver !== undefined) profileUpdates.is_verified_driver = data.is_verified_driver
+  if (data.cnic_verified !== undefined) profileUpdates.cnic_verified = data.cnic_verified
+
+  if (data.verification_tier !== undefined) {
+    const rawTier = data.verification_tier.toLowerCase().trim()
+    if (rawTier === 'student') {
+      profileUpdates.verification_tier = 'student'
+      const expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + 6)
+      profileUpdates.verification_expiry_date = expiryDate.toISOString()
+    } else if (rawTier === 'pro') {
+      profileUpdates.verification_tier = 'pro'
+    } else {
+      profileUpdates.verification_tier = 'none'
+      profileUpdates.verification_expiry_date = null
+    }
   }
 
   if (Object.keys(profileUpdates).length > 0) {
@@ -51,6 +73,7 @@ export async function updateUserProfile(userId: string, data: {
   }
 
   revalidatePath('/users')
+  revalidatePath('/student-verifications')
 }
 
 export async function deleteUserAccount(userId: string) {

@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createAdminClient, getSignedUrlsBatch } from '@/utils/supabase/admin'
 import RoutesCollectionClient, { EnrichedRoute } from '../components/RoutesCollectionClient'
 import VehiclesCollectionClient, { EnrichedVehicle } from '../components/VehiclesCollectionClient'
 import RideDemandCollectionClient, { EnrichedRideDemand } from '../components/RideDemandCollectionClient'
@@ -23,33 +23,35 @@ export default async function CollectionPage({ params }: { params: Promise<{ tab
 
   const supabase = createAdminClient()
 
-  // 1. Fetch user profiles map to replace UUIDs with human names everywhere
-  const { data: profilesData } = await supabase
-    .from('profiles')
-    .select('id, full_name, phone, avatar_url')
+  const fetchProfiles = () =>
+    supabase.from('profiles').select('id, full_name, phone, avatar_url')
 
-  const profilesMap = new Map<string, { full_name: string; phone: string | null; avatar_url: string | null }>()
-  if (profilesData) {
-    profilesData.forEach((p) => {
-      profilesMap.set(p.id, {
-        full_name: p.full_name || 'Unnamed User',
-        phone: p.phone || null,
-        avatar_url: p.avatar_url || null,
+  const buildProfilesMap = (profilesData: any[] | null) => {
+    const map = new Map<string, { full_name: string; phone: string | null; avatar_url: string | null }>()
+    if (profilesData) {
+      profilesData.forEach((p) => {
+        map.set(p.id, {
+          full_name: p.full_name || 'Unnamed User',
+          phone: p.phone || null,
+          avatar_url: p.avatar_url || null,
+        })
       })
-    })
+    }
+    return map
   }
 
   // Specialized view: ROUTES
   if (table === 'routes') {
-    const { data: rawRoutes, error } = await supabase
-      .from('routes')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200)
+    const [{ data: profilesData }, { data: rawRoutes, error }] = await Promise.all([
+      fetchProfiles(),
+      supabase.from('routes').select('*').order('created_at', { ascending: false }).limit(200)
+    ])
 
     if (error) {
       return <div className="p-6 text-rose-600 font-bold">Error loading routes: {error.message}</div>
     }
+
+    const profilesMap = buildProfilesMap(profilesData)
 
     const enrichedRoutes: EnrichedRoute[] = (rawRoutes || []).map((r) => {
       const profile = profilesMap.get(r.user_id)
@@ -76,14 +78,21 @@ export default async function CollectionPage({ params }: { params: Promise<{ tab
 
   // Specialized view: VEHICLES
   if (table === 'vehicles') {
-    const [{ data: rawVehicles, error: vehiclesError }, { data: driverApps }] = await Promise.all([
-      supabase.from('vehicles').select('*').order('created_at', { ascending: false }).limit(200),
-      supabase.from('driver_applications').select('vehicle_id, user_id, registration_doc_url, license_doc_url, status').order('submitted_at', { ascending: false }),
-    ])
+    const [{ data: profilesData }, { data: rawVehicles, error: vehiclesError }, { data: driverApps }] =
+      await Promise.all([
+        fetchProfiles(),
+        supabase.from('vehicles').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase
+          .from('driver_applications')
+          .select('vehicle_id, user_id, registration_doc_url, license_doc_url, status')
+          .order('submitted_at', { ascending: false }),
+      ])
 
     if (vehiclesError) {
       return <div className="p-6 text-rose-600 font-bold">Error loading vehicles: {vehiclesError.message}</div>
     }
+
+    const profilesMap = buildProfilesMap(profilesData)
 
     // Map driver applications by vehicle_id and user_id fallback
     const appByVehicleId = new Map<string, any>()
@@ -99,70 +108,69 @@ export default async function CollectionPage({ params }: { params: Promise<{ tab
       })
     }
 
-    // Helper to generate signed storage URL
-    const getDocSignedUrl = async (path?: string | null) => {
-      if (!path) return null
-      if (path.startsWith('http://') || path.startsWith('https://')) return path
-      try {
-        const { data } = await supabase.storage.from('verification-documents').createSignedUrl(path, 3600)
-        return data?.signedUrl || null
-      } catch {
-        return null
+    // Collect document paths to batch sign in ONE storage call
+    const docPaths: string[] = []
+    ;(rawVehicles || []).forEach((v) => {
+      const app = appByVehicleId.get(v.id) || appByUserId.get(v.user_id)
+      if (app?.registration_doc_url) docPaths.push(app.registration_doc_url)
+      if (app?.license_doc_url) docPaths.push(app.license_doc_url)
+    })
+
+    const signedUrlsMap = await getSignedUrlsBatch(docPaths)
+
+    const enrichedVehicles: EnrichedVehicle[] = (rawVehicles || []).map((v) => {
+      const profile = profilesMap.get(v.user_id)
+      const app = appByVehicleId.get(v.id) || appByUserId.get(v.user_id)
+      const registration_doc_url = app?.registration_doc_url || null
+      const license_doc_url = app?.license_doc_url || null
+
+      const registration_doc_signed_url = registration_doc_url
+        ? signedUrlsMap.get(registration_doc_url) || null
+        : null
+      const license_doc_signed_url = license_doc_url
+        ? signedUrlsMap.get(license_doc_url) || null
+        : null
+
+      return {
+        id: v.id,
+        user_id: v.user_id,
+        driver_name: profile?.full_name || 'Unassigned Driver',
+        driver_phone: profile?.phone || null,
+        driver_avatar: profile?.avatar_url || null,
+        reg_number: v.reg_number || 'UNKNOWN',
+        brand: v.brand || 'Vehicle',
+        variant: v.variant || null,
+        type: v.type || 'car',
+        color: v.color || 'Standard',
+        model_year: v.model_year || 2022,
+        capacity: v.capacity || 4,
+        has_ac: v.has_ac ?? false,
+        is_active: v.is_active ?? true,
+        created_at: v.created_at || new Date().toISOString(),
+        registration_doc_url,
+        registration_doc_signed_url,
+        license_doc_url,
+        license_doc_signed_url,
+        application_status: app?.status || null,
+        raw_data: v,
       }
-    }
-
-    const enrichedVehicles: EnrichedVehicle[] = await Promise.all(
-      (rawVehicles || []).map(async (v) => {
-        const profile = profilesMap.get(v.user_id)
-        const app = appByVehicleId.get(v.id) || appByUserId.get(v.user_id)
-        const registration_doc_url = app?.registration_doc_url || null
-        const license_doc_url = app?.license_doc_url || null
-
-        const [registration_doc_signed_url, license_doc_signed_url] = await Promise.all([
-          getDocSignedUrl(registration_doc_url),
-          getDocSignedUrl(license_doc_url),
-        ])
-
-        return {
-          id: v.id,
-          user_id: v.user_id,
-          driver_name: profile?.full_name || 'Unassigned Driver',
-          driver_phone: profile?.phone || null,
-          driver_avatar: profile?.avatar_url || null,
-          reg_number: v.reg_number || 'UNKNOWN',
-          brand: v.brand || 'Vehicle',
-          variant: v.variant || null,
-          type: v.type || 'car',
-          color: v.color || 'Standard',
-          model_year: v.model_year || 2022,
-          capacity: v.capacity || 4,
-          has_ac: v.has_ac ?? false,
-          is_active: v.is_active ?? true,
-          created_at: v.created_at || new Date().toISOString(),
-          registration_doc_url,
-          registration_doc_signed_url,
-          license_doc_url,
-          license_doc_signed_url,
-          application_status: app?.status || null,
-          raw_data: v,
-        }
-      })
-    )
+    })
 
     return <VehiclesCollectionClient vehicles={enrichedVehicles} />
   }
 
   // Specialized view: RIDE DEMAND
   if (table === 'ride_demand') {
-    const { data: rawDemands, error } = await supabase
-      .from('ride_demand')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200)
+    const [{ data: profilesData }, { data: rawDemands, error }] = await Promise.all([
+      fetchProfiles(),
+      supabase.from('ride_demand').select('*').order('created_at', { ascending: false }).limit(200)
+    ])
 
     if (error) {
       return <div className="p-6 text-rose-600 font-bold">Error loading ride demand: {error.message}</div>
     }
+
+    const profilesMap = buildProfilesMap(profilesData)
 
     const enrichedDemands: EnrichedRideDemand[] = (rawDemands || []).map((d) => {
       const profile = profilesMap.get(d.user_id)
@@ -190,15 +198,16 @@ export default async function CollectionPage({ params }: { params: Promise<{ tab
 
   // Specialized view: MATCHES
   if (table === 'matches') {
-    const { data: rawMatches, error } = await supabase
-      .from('matches')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200)
+    const [{ data: profilesData }, { data: rawMatches, error }] = await Promise.all([
+      fetchProfiles(),
+      supabase.from('matches').select('*').order('created_at', { ascending: false }).limit(200)
+    ])
 
     if (error) {
       return <div className="p-6 text-rose-600 font-bold">Error loading matches: {error.message}</div>
     }
+
+    const profilesMap = buildProfilesMap(profilesData)
 
     const enrichedMatches: EnrichedMatch[] = (rawMatches || []).map((m) => {
       const userA = profilesMap.get(m.user_a_id)
@@ -228,15 +237,16 @@ export default async function CollectionPage({ params }: { params: Promise<{ tab
 
   // Specialized view: NOTIFICATIONS
   if (table === 'notifications') {
-    const { data: rawNotifs, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200)
+    const [{ data: profilesData }, { data: rawNotifs, error }] = await Promise.all([
+      fetchProfiles(),
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(200)
+    ])
 
     if (error) {
       return <div className="p-6 text-rose-600 font-bold">Error loading notifications: {error.message}</div>
     }
+
+    const profilesMap = buildProfilesMap(profilesData)
 
     const enrichedNotifications: EnrichedNotification[] = (rawNotifs || []).map((n) => {
       const profile = profilesMap.get(n.user_id)

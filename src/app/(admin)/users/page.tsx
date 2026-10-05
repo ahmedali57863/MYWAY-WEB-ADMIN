@@ -6,34 +6,30 @@ export const dynamic = 'force-dynamic'
 export default async function UsersPage() {
   const adminSupabase = createAdminClient()
 
-  // Fetch all profiles from Supabase using admin client
-  const { data: profiles, error: profilesError } = await adminSupabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false })
+  // Fetch all user data from Supabase concurrently
+  const [
+    { data: profiles, error: profilesError },
+    { data: verifications },
+    { data: driverApps },
+    { data: studentVerifs },
+    { data: routes },
+    { data: demands },
+    { data: matches },
+    { data: authData }
+  ] = await Promise.all([
+    adminSupabase.from('profiles').select('*').order('created_at', { ascending: false }),
+    adminSupabase.from('verifications').select('user_id, status'),
+    adminSupabase.from('driver_applications').select('user_id, status'),
+    adminSupabase.from('student_verifications').select('user_id, status'),
+    adminSupabase.from('routes').select('user_id'),
+    adminSupabase.from('ride_demand').select('user_id'),
+    adminSupabase.from('matches').select('user_a_id, user_b_id'),
+    adminSupabase.auth.admin.listUsers()
+  ])
 
   if (profilesError) {
     console.error('Error fetching users/profiles:', profilesError)
   }
-
-  // Fetch verifications to map status
-  const { data: verifications } = await adminSupabase
-    .from('verifications')
-    .select('user_id, status')
-
-  const { data: driverApps } = await adminSupabase
-    .from('driver_applications')
-    .select('user_id, status')
-
-  const { data: studentVerifs } = await adminSupabase
-    .from('student_verifications')
-    .select('user_id, status')
-
-  const { data: routes } = await adminSupabase.from('routes').select('user_id')
-  const { data: demands } = await adminSupabase.from('ride_demand').select('user_id')
-  const { data: matches } = await adminSupabase.from('matches').select('user_a_id, user_b_id')
-
-  const { data: authData } = await adminSupabase.auth.admin.listUsers()
 
   const userStats = new Map<string, { routes: number, demands: number, matches: number }>()
   

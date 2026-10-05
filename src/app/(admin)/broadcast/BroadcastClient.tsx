@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { broadcastNotification } from './actions'
+import { Header, Button, Icon, Badge } from '@/components/ui/FigmaUI'
 
 type BroadcastSummary = {
   attempted: number
@@ -15,107 +16,154 @@ type BroadcastSummary = {
 export default function BroadcastClient() {
   const [heading, setHeading] = useState('')
   const [message, setMessage] = useState('')
+  const [audience, setAudience] = useState('all')
   const [sending, setSending] = useState(false)
   const [summary, setSummary] = useState<BroadcastSummary | null>(null)
 
   const handleSend = async () => {
     if (!heading.trim() || !message.trim()) {
-      alert('Please enter both heading and message.')
+      alert('Please provide both a notification title and message body.')
       return
     }
 
-    if (!confirm('Are you sure you want to send this push notification to ALL users? This action is irreversible.')) {
+    if (!confirm('Are you sure you want to broadcast this push notification to users? This action cannot be reversed.')) {
       return
     }
 
     setSending(true)
     setSummary(null)
-    
+
     try {
       const data = await broadcastNotification(heading, message)
       setSummary(data)
       setHeading('')
       setMessage('')
     } catch (e: any) {
-      alert(e.message)
+      alert(e.message || 'Failed to dispatch broadcast')
     } finally {
       setSending(false)
     }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="heading" className="block text-sm font-semibold text-gray-700 mb-1">
-              Heading
-            </label>
-            <input
-              id="heading"
-              type="text"
-              className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              placeholder="e.g., New Feature Alert!"
+    <>
+      <Header 
+        title="Broadcast notification" 
+        description="Dispatch instant push notifications to the MYWAY mobile community with live delivery tracking."
+      />
+
+      <div className="broadcast-grid">
+        {/* Left Form Panel */}
+        <section className="panel form-panel">
+          <div className="field">
+            <label>Notification Heading</label>
+            <input 
+              placeholder="e.g. Campus Route Expansion or Safety Notice" 
               value={heading}
               onChange={(e) => setHeading(e.target.value)}
               maxLength={60}
             />
           </div>
 
-          <div>
-            <label htmlFor="message" className="block text-sm font-semibold text-gray-700 mb-1">
-              Message
-            </label>
-            <textarea
-              id="message"
-              className="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          <div className="field">
+            <label>Message Body</label>
+            <textarea 
+              placeholder="Write a clear and concise notification message..." 
               rows={5}
-              placeholder="Enter the notification body here..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              maxLength={200}
+              maxLength={220}
             />
           </div>
 
-          <div className="pt-2">
-            <button
-              onClick={handleSend}
-              disabled={sending || !heading.trim() || !message.trim()}
-              className="w-full py-3 px-4 bg-indigo-600 text-white rounded-md font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors flex justify-center items-center"
-            >
-              {sending ? 'Sending...' : 'Send to All Users'}
-            </button>
+          <div className="form-row">
+            <div className="field">
+              <label>Target Audience</label>
+              <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+                <option value="all">All registered devices</option>
+                <option value="drivers">Active Drivers</option>
+                <option value="students">Verified Students</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Delivery Mode</label>
+              <select defaultValue="instant">
+                <option value="instant">Send immediately</option>
+                <option value="scheduled" disabled>Schedule for later (Beta)</option>
+              </select>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {summary && (
-        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900 mb-2 text-center">Broadcast Summary</h3>
-          <p className="text-gray-600 text-sm text-center mb-6 italic">
-            Sent to {summary.attempted} of {summary.totalRegistered} registered devices ({summary.optedOut} opted out).
+          <Button 
+            disabled={sending || !heading.trim() || !message.trim()}
+            onClick={handleSend}
+          >
+            <Icon name="send" /> {sending ? 'Dispatching Push Notification...' : 'Send Broadcast'}
+          </Button>
+
+          {summary && (
+            <div style={{
+              marginTop: '16px',
+              padding: '16px',
+              borderRadius: '12px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>Delivery Dispatch Report</span>
+                <Badge tone={summary.failed === 0 ? "success" : "warning"}>
+                  {summary.succeeded} Delivered
+                </Badge>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+                <div style={{ color: '#64748b' }}>
+                  Total Devices: <strong style={{ color: '#0f172a' }}>{summary.totalRegistered}</strong>
+                </div>
+                <div style={{ color: '#64748b' }}>
+                  Attempted: <strong style={{ color: '#0f172a' }}>{summary.attempted}</strong>
+                </div>
+                <div style={{ color: '#16a34a' }}>
+                  Successful: <strong>{summary.succeeded}</strong>
+                </div>
+                <div style={{ color: '#dc2626' }}>
+                  Failed: <strong>{summary.failed}</strong>
+                </div>
+                <div style={{ color: '#64748b' }}>
+                  Opted Out: <strong>{summary.optedOut}</strong>
+                </div>
+                <div style={{ color: '#64748b' }}>
+                  Stale Tokens Cleared: <strong>{summary.staleRemoved}</strong>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Right Live Device Preview */}
+        <aside className="panel preview-card">
+          <p style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.05em', color: '#94a3b8', margin: '0 0 12px 0' }}>
+            LIVE PHONE PREVIEW
           </p>
           
-          <div className="space-y-3">
-            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-              <span className="text-gray-600">Total Attempted:</span>
-              <span className="font-bold text-gray-900">{summary.attempted}</span>
-            </div>
-            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-              <span className="text-gray-600">Succeeded:</span>
-              <span className="font-bold text-green-600">{summary.succeeded}</span>
-            </div>
-            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-              <span className="text-gray-600">Failed:</span>
-              <span className="font-bold text-red-600">{summary.failed}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Stale Tokens Removed:</span>
-              <span className="font-bold text-gray-900">{summary.staleRemoved}</span>
+          <div className="phone-preview">
+            <span className="app-mark">M</span>
+            <div>
+              <b>MYWAY</b>
+              <strong>{heading.trim() || 'Notification Title'}</strong>
+              <p>{message.trim() || 'Your push notification content will appear here on user lock screens in real time.'}</p>
+              <small>now</small>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+
+          <div className="delivery-note" style={{ marginTop: '20px' }}>
+            <Icon name="shield" />
+            <span>
+              <b>Safe delivery pipeline</b>
+              <p>Opted-out devices and inactive tokens are automatically pruned during dispatch.</p>
+            </span>
+          </div>
+        </aside>
+      </div>
+    </>
   )
 }

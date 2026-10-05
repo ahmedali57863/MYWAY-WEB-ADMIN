@@ -19,3 +19,34 @@ export function createAdminClient() {
     }
   )
 }
+
+export async function getSignedUrlsBatch(
+  paths: (string | null | undefined)[],
+  bucket: string = 'verification-documents',
+  expiresIn: number = 3600
+): Promise<Map<string, string>> {
+  const validPaths = Array.from(
+    new Set(paths.filter((p): p is string => Boolean(p && !p.startsWith('http'))))
+  )
+  const urlMap = new Map<string, string>()
+
+  if (validPaths.length === 0) {
+    return urlMap
+  }
+
+  try {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrls(validPaths, expiresIn)
+    if (!error && data) {
+      data.forEach((item) => {
+        if (item.path && item.signedUrl) {
+          urlMap.set(item.path, item.signedUrl)
+        }
+      })
+    }
+  } catch (err) {
+    console.error('Error batch signing URLs:', err)
+  }
+
+  return urlMap
+}

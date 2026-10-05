@@ -30,6 +30,31 @@ export async function adminReviewStudentVerification(id: string, status: string,
   revalidatePath('/student-verifications')
 }
 
+export async function adminRevokeStudentBadge(userId: string) {
+  const { createAdminClient } = await import('@/utils/supabase/admin')
+  const supabase = createAdminClient()
+
+  // 1. Update profiles table to revoke student tier and pro benefits
+  const { error: profileError } = await supabase.from('profiles').update({
+    verification_tier: 'none',
+    is_pro: false,
+    verification_expiry_date: null,
+    pro_expiry_date: null
+  }).eq('id', userId)
+
+  if (profileError) throw new Error(profileError.message)
+
+  // 2. Mark any student verification records for this user as rejected/revoked
+  await supabase.from('student_verifications').update({
+    status: 'rejected',
+    rejection_reason: 'Student badge suspended/revoked by administrator',
+    reviewed_at: new Date().toISOString()
+  }).eq('user_id', userId)
+
+  revalidatePath('/student-verifications')
+  revalidatePath('/users')
+}
+
 // Signed URL helper
 export async function getSignedUrl(path: string) {
   if (!path) return null
